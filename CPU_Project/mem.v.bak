@@ -1,0 +1,68 @@
+`include "defines.v"
+module mem(
+	input	wire	rst,
+	
+	//来自执行阶段的信息
+	input	wire[`RegAddrBus]	wd_i,
+	input	wire		wreg_i,
+	input	wire[`RegBus]		wdata_i,
+	input	wire		memW_i,
+	input	wire		memR_i,
+	input	wire		mem_addr_i,
+	
+	//来自外部数据寄存器RAM的信息
+	input	wire[`RegBus]		mem_data_i,
+	
+	//访存阶段的值
+	output	reg[`RegAddrBus]	wd_o,
+	output	reg			wreg_o,
+	output	reg[`RegBus]		wdata_o,
+	
+	//送到数据寄存器RAM的信息
+	output	reg[`RegBus]		mem_addr_o,
+	output	wire				mem_we_o,
+	output	wire				mem_re_o,
+	output	reg[3:0]			mem_sel_o,
+	output	reg[`RegBus]		mem_data_o,
+	output	reg					mem_ce_o
+);
+
+	wire[`RegBus]	zero32;
+	reg				mem_we;
+	reg				mem_re;
+	
+	assign	mem_we_o = mem_we;
+	assign	mem_re_o = mem_re;
+	assign	zero32 = `ZeroWord;
+
+	always@ (*) begin
+		if(rst == `RstEnable) begin
+			wd_o <= `NOPRegAddr;
+			wreg_o <= `WriteDisable;
+			wdata_o <= `ZeroWord;
+			mem_addr_o <= `ZeroWord;
+			mem_sel_o <= 4'b0000;
+			mem_data_o <= `ZeroWord;
+			mem_ce_o <= `ChipDisable;
+		end	else begin
+			wd_o <= wd_i;
+			wreg_o <= wreg_i;
+			if(memW_i == `WriteEnable || memR_i == `ReadEnable) begin 
+				wdata_o <= mem_data_i;
+				mem_addr_o <= mem_addr_i;
+				mem_sel_o <= 4'b1111;
+				mem_data_o <= wdata_i;
+				mem_ce_o <= `ChipEnable;
+			end else begin
+				wdata_o <= wdata_i;
+				mem_addr_o <= `ZeroWord;
+				mem_sel_o <= 4'b0000;
+				mem_data_o <= `ZeroWord;
+				mem_ce_o <= `ChipDisable;
+			end
+			
+		end
+	end
+	
+	
+endmodule

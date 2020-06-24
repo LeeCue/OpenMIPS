@@ -1,0 +1,148 @@
+`include "defines.v"
+module ex(
+	input	wire	rst,
+	
+	//译码阶段送到执行阶段的信息
+	input	wire[`AluOpBus]		aluop_i,
+	input	wire[`AluSelBus]	alusel_i,
+	input	wire[`RegBus]		reg1_i,
+	input	wire[`RegBus]		reg2_i,
+	input	wire[`RegAddrBus]	wd_i,
+	input	wire[`RegBus]		imm_i,
+	input	wire				wreg_i,
+	input	wire				alusrc_i,
+	input	wire				memW_i,
+	input	wire				memR_i,
+	input	wire				in_i,
+	input	wire				out_i,
+	
+	//执行结果
+	output	reg[`RegAddrBus]	wd_o,
+	output	reg		wreg_o,
+	output	reg[`RegBus]		wdata_o,
+	output	reg[`RegBus]		mem_addr_o,
+	
+	//送到访存阶段的信息
+	output	reg					memW_o,
+	output	reg					memR_o,
+	output	reg					in_o,
+	output	reg					out_o,
+);
+
+	wire			ov_sum;				//保存溢出情况
+	wire			reg1_eq_reg2;		//第一个操作数是否等于第二个操作数
+	wire			reg1_lt_reg2;		//第一个操作数是否小于第二个操作数
+	reg[`RegBus]	logicout;			//保存逻辑运算的结果
+	reg[`RegBus]	arithmeticres;		//保存算术运算的结果
+	wire[`RegBus]	reg2_i_mux;			//保存输入的第二个操作数reg2_i的补码
+	wire[`RegBus]	result_sum;			//保存加法结果
+	wire[`RegBus]	data2;				//ALU第二个操作数
+	wire[`RegBus]	left2_data;			//立即数左移2
+	
+	//一、计算下列变量的值
+	//如果是减法或者有符号比较运算，那么reg2_i_mux等于第二个操作数reg2_i的补码，否则就等于第二个操作数reg2_i
+	assign	reg2_i_mux = ((alusel_i == `EXE_SUB_sel)  ||
+						  (alusel_i == `EXE_SLT_sel))  ?
+						  (~reg2_i) + 1 : reg2_i;
+	
+	//将立即数左移2
+	assign	left2_data = imm_i << 2;
+	
+	//选择ALU第二个操作数
+	assign	data2 = (alusrc_i == 1'b1) ? imm_i : reg2_i_mux;
+	
+	//计算加法、减法的结果
+	assign	result_sum = reg1_i + data2;
+	
+	//计算是否溢出，加法指令(add)和减法指令(sub)执行的时候
+	assign	ov_sum = ((!reg1_i[31] && !reg2_i_mux[31]) && result_sum[31]) || 
+					  ((reg1_i[31] && reg2_i_mux[31]) && (!result_sum[31]));
+	
+	//计算操作数1是否小于操作数2
+	assign	reg1_lt_reg2 = ((alusel_i == `EXE_SLT_sel)) ? 
+							((reg1_i[31] && !reg2_i[31]) ||
+							 (!reg1_i[31] && !reg2_i[31]) && result_sum[31]) ||
+							 (reg1_i[31] && reg2_i[31] && result_sum[31])
+							 :(reg1_i < reg2_i);
+	
+	//二、依据不同的运算类型，给arithmeticres、logicout赋值
+	always@ (*) begin
+		case(alusel_i)
+			`EXE_ADD_sel, `EXE_SUB_sel: begin
+				arithmeticres <= result_sum;		//加法、减法运算
+			end
+			`EXE_SLT_sel: begin
+				arithmeticres <= {31'b0,reg1_lt_reg2};		//比较运算
+			end
+			`EXE_AND_sel: begin
+				logicout <= reg1_i & reg2_i;		//逻辑与操作
+			end
+			`EXE_OR_sel: begin
+				logicout <= reg1_i | reg2_i;		//逻辑或操作
+			end
+			default: begin
+				arithmeticres <= `ZeroWord;
+				logicout <= `ZeroWord;
+			end
+		endcase
+	end
+				
+	
+	//三、确定要写出的值
+	always@ (*) begin
+		if(rst == `RstEnable) begin
+			wdata_o <= `ZeroWord;
+			wd_o	<= `NOPRegAddr;
+			memW_o	<= `WriteDisable;
+			memR_o	<= `ReadDisable;
+			mem_addr_o	<= `ZeroWord;
+			wreg_o	<= `WriteDisable;
+			in_o	<= `NotIn;
+			out_o	<= `NotOut;
+		end else begin
+			memW_o	<= memW_i;
+			memR_o	<= memR_i;
+			in_o	<= in_i;
+			out_o	<= out_i;
+			//如果是add、sub指令，结果发生溢出，那么设置wreg_o为WriteDisable，不写入目的寄存器
+			if(((alusel_i == `EXE_ADD_sel) || (alusel_i == `EXE_SUB_sel)) && (ov_sum == 1'b1)) begin
+				wreg_o <= `WriteDisable;
+			end else begin
+				wreg_o <= wreg_i;
+			end
+			case(aluop_i)
+				`EXE_arithmetic_op: begin 					//如果是R-type指令
+					case(alusel_i)
+					`EXE_ADD_sel, `EXE_SUB_sel, `EXE_SLT_sel: begin
+						wdata_o <= arithmeticres;
+						wd_o <=	wd_i;
+						mem_addr_o <= `ZeroWord;
+					end
+					`EXE_AND_sel, `EXE_OR_sel: begin
+						wdata_o <= logicout;
+						wd_o <=	wd_i;
+						mem_addr_o <= `ZeroWord;
+					end
+					default:	begin
+						wdata_o <= `ZeroWord;
+						wd_o <=	wd_i;
+						mem_addr_o <= `ZeroWord;
+					end
+					endcase
+				end
+				`EXE_ls_op: begin 
+					mem_addr_o <= arithmeticres;
+					wdata_o <= reg2_i;
+					wd_o <= wd_i;
+				end
+			endcase	
+		end
+	end
+endmodule	
+	
+	
+	
+	
+	
+	
+	

@@ -1,0 +1,41 @@
+`timescale	1ns/1ps
+`include "defines.v"
+module cpu_tb();
+
+	reg		CLOCK_10K;
+	reg		rst;
+	
+	reg		k1_ten;
+	reg		k2_ge;
+	reg		enter;
+	
+	//每隔50000ns，CLOCK_10K信号翻转一次，所以每一个周期是100000ns，对应10KHZ
+	initial	begin
+		CLOCK_10K = 1'b0;
+		enter = 1'b0;
+		forever #50000	CLOCK_10K = ~CLOCK_10K; 	//10KHZ
+		//forever #10	CLOCK_10K = ~CLOCK_10K; 	//50MHZ
+	end
+	
+	initial begin 
+		rst = `RstEnable;
+		#2000000000 rst = `RstDisable;
+		#3000000000 enter = 1'b1;
+		//#195  rst = `RstDisable;
+		#2000000020  k2_ge = 1'b1;
+		#2000000030  k2_ge = 1'b0;
+		
+		#2000000040  k1_ten = 1'b1;
+		#2000000050  k1_ten = 1'b0; 
+	end
+	
+	//例化cpu模块
+	cpu cpu0(
+			.CLOCK_10K(CLOCK_10K),
+			.rst(rst),
+			.enter(enter),
+			.k1(k1_ten),
+			.k2(k2_ge)
+	);
+	
+endmodule

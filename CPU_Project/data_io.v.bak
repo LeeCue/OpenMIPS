@@ -1,0 +1,423 @@
+`include "defines.v"
+module data_io(
+	//来自于实验箱
+	input	wire	clk,
+	input	wire	rst,
+	input	wire	k1_ten,
+	input	wire	k2_ge,
+	
+	//来自于sopc的输出pc(指令地址)、res(指令运算结果)
+	input	wire[`InstAddrBus]	pc_in,
+	input	wire[`RegBus]		res,
+	input	wire				out_i,		//输出使能
+
+	//输出给指令，作为要读取的数据
+	output	reg[`RegBus]	data_o,
+
+	//输出给实验箱
+	output	reg[2:0]	sel,
+	output	reg[7:0]	seg
+);
+	//parameter	keydown_time = 2;
+	parameter	T1KHZ = 2_499;
+	integer     cnt1;
+
+	reg		clk_10k;
+
+	//保存运算结果
+	reg[`RegBus]	result;
+	
+	//保存调节的数字
+	reg[3:0]		shiwei;
+	reg[3:0]		gewei;
+	
+	//用来消抖判断
+	//reg[2:0]		count_high;
+	//reg[2:0]		count_low;
+	
+	//取sopc输出地址中的低8位
+	wire[3:0]	pc_2;
+	wire[3:0]	pc_1;
+	
+	//取sopc输出数据中的低8位
+	wire[3:0]	res_2;
+	wire[3:0]	res_1;
+	
+	assign	pc_2 = pc_in[3:0];
+	assign	pc_1 = pc_in[7:4];
+	
+	assign	res_2 = result[3:0];
+	assign	res_1 = result[7:4];
+	
+	initial begin 
+		sel = 3'b000;
+	end
+	
+	always@ (posedge clk) begin 
+		if(rst == 1'b1) begin 
+			cnt1	<= 0;
+			clk_10k <= 0;
+		end
+		if(cnt1 == T1KHZ) begin 
+			clk_10k <= ~clk_10k;
+			cnt1 <= 0;
+		end else begin 
+			cnt1 <= cnt1 + 1;
+		end
+	end
+	
+	//用大频率的时钟信号不断刷新位选
+	always@ (posedge clk_10k) begin
+		if(sel == 3'b111) begin 
+			sel <= 3'b000;
+		end else begin 
+			sel <= sel + 1;
+		end
+	end
+	
+	//判断当前的位选信息，并将数据写入
+	always@ (*) begin 
+		if(out_i == `WriteEnable) begin 
+			result <= res; 
+		end
+		if(rst == `RstEnable) begin 
+			seg <= `data_0;
+			result <= `ZeroWord;
+			shiwei <= 4'd0;
+			gewei  <= 4'd0;
+			data_o <= `ZeroWord;
+		end else begin 
+			data_o <= {26'd0,shiwei[3:0],gewei[3:0]};
+			if(sel == 3'b000) begin 
+				case(pc_1) 
+					4'd0: begin 
+						seg = `data_0;
+					end
+					4'd1: begin 
+						seg = `data_1;
+					end
+					4'd2: begin 
+						seg = `data_2;
+					end
+					4'd3: begin 
+						seg = `data_3;
+					end
+					4'd4: begin 
+						seg = `data_4;
+					end
+					4'd5: begin 
+						seg = `data_5;
+					end
+					4'd6: begin 
+						seg = `data_6;
+					end
+					4'd7: begin 
+						seg = `data_7;
+					end
+					4'd8: begin 
+						seg = `data_8;
+					end
+					4'd9: begin 
+						seg = `data_9;
+					end
+					4'd10: begin 
+						seg = `data_a;
+					end
+					4'd11: begin 
+						seg = `data_b;
+					end
+					4'd12: begin 
+						seg = `data_c;
+					end
+					4'd13: begin 
+						seg = `data_d;
+					end
+					4'd14: begin 
+						seg = `data_e;
+					end
+					4'd15: begin 
+						seg = `data_f;
+					end
+				endcase
+			end
+			else if(sel == 3'b001) begin			
+				case(pc_2) 
+					4'd0: begin 
+						seg = `data_0;
+					end
+					4'd1: begin 
+						seg = `data_1;
+					end
+					4'd2: begin 
+						seg = `data_2;
+					end
+					4'd3: begin 
+						seg = `data_3;
+					end
+					4'd4: begin 
+						seg = `data_4;
+					end
+					4'd5: begin 
+						seg = `data_5;
+					end
+					4'd6: begin 
+						seg = `data_6;
+					end
+					4'd7: begin 
+						seg = `data_7;
+					end
+					4'd8: begin 
+						seg = `data_8;
+					end
+					4'd9: begin 
+						seg = `data_9;
+					end
+					4'd10: begin 
+						seg = `data_a;
+					end
+					4'd11: begin 
+						seg = `data_b;
+					end
+					4'd12: begin 
+						seg = `data_c;
+					end
+					4'd13: begin 
+						seg = `data_d;
+					end
+					4'd14: begin 
+						seg = `data_e;
+					end
+					4'd15: begin 
+						seg = `data_f;
+					end
+				endcase
+			end
+			else if(sel == 3'b110) begin 
+				case(res_1) 
+					4'd0: begin 
+						seg = `data_0;
+					end
+					4'd1: begin 
+						seg = `data_1;
+					end
+					4'd2: begin 
+						seg = `data_2;
+					end
+					4'd3: begin 
+						seg = `data_3;
+					end
+					4'd4: begin 
+						seg = `data_4;
+					end
+					4'd5: begin 
+						seg = `data_5;
+					end
+					4'd6: begin 
+						seg = `data_6;
+					end
+					4'd7: begin 
+						seg = `data_7;
+					end
+					4'd8: begin 
+						seg = `data_8;
+					end
+					4'd9: begin 
+						seg = `data_9;
+					end
+					4'd10: begin 
+						seg = `data_a;
+					end
+					4'd11: begin 
+						seg = `data_b;
+					end
+					4'd12: begin 
+						seg = `data_c;
+					end
+					4'd13: begin 
+						seg = `data_d;
+					end
+					4'd14: begin 
+						seg = `data_e;
+					end
+					4'd15: begin 
+						seg = `data_f;
+					end
+				endcase
+			end
+			else if(sel == 3'b111) begin 
+				case(res_2) 
+					4'd0: begin 
+						seg = `data_0;
+					end
+					4'd1: begin 
+						seg = `data_1;
+					end
+					4'd2: begin 
+						seg = `data_2;
+					end
+					4'd3: begin 
+						seg = `data_3;
+					end
+					4'd4: begin 
+						seg = `data_4;
+					end
+					4'd5: begin 
+						seg = `data_5;
+					end
+					4'd6: begin 
+						seg = `data_6;
+					end
+					4'd7: begin 
+						seg = `data_7;
+					end
+					4'd8: begin 
+						seg = `data_8;
+					end
+					4'd9: begin 
+						seg = `data_9;
+					end
+					4'd10: begin 
+						seg = `data_a;
+					end
+					4'd11: begin 
+						seg = `data_b;
+					end
+					4'd12: begin 
+						seg = `data_c;
+					end
+					4'd13: begin 
+						seg = `data_d;
+					end
+					4'd14: begin 
+						seg = `data_e;
+					end
+					4'd15: begin 
+						seg = `data_f;
+					end
+				endcase
+			end
+			else if(sel == 3'b100) begin 
+				case(shiwei) 
+					4'd0: begin 
+						seg = `data_0;
+					end
+					4'd1: begin 
+						seg = `data_1;
+					end
+					4'd2: begin 
+						seg = `data_2;
+					end
+					4'd3: begin 
+						seg = `data_3;
+					end
+					4'd4: begin 
+						seg = `data_4;
+					end
+					4'd5: begin 
+						seg = `data_5;
+					end
+					4'd6: begin 
+						seg = `data_6;
+					end
+					4'd7: begin 
+						seg = `data_7;
+					end
+					4'd8: begin 
+						seg = `data_8;
+					end
+					4'd9: begin 
+						seg = `data_9;
+					end
+					4'd10: begin 
+						seg = `data_a;
+					end
+					4'd11: begin 
+						seg = `data_b;
+					end
+					4'd12: begin 
+						seg = `data_c;
+					end
+					4'd13: begin 
+						seg = `data_d;
+					end
+					4'd14: begin 
+						seg = `data_e;
+					end
+					4'd15: begin 
+						seg = `data_f;
+					end
+				endcase
+			end
+			else if(sel == 3'b101) begin 
+				case(gewei) 
+					4'd0: begin 
+						seg = `data_0;
+					end
+					4'd1: begin 
+						seg = `data_1;
+					end
+					4'd2: begin 
+						seg = `data_2;
+					end
+					4'd3: begin 
+						seg = `data_3;
+					end
+					4'd4: begin 
+						seg = `data_4;
+					end
+					4'd5: begin 
+						seg = `data_5;
+					end
+					4'd6: begin 
+						seg = `data_6;
+					end
+					4'd7: begin 
+						seg = `data_7;
+					end
+					4'd8: begin 
+						seg = `data_8;
+					end
+					4'd9: begin 
+						seg = `data_9;
+					end
+					4'd10: begin 
+						seg = `data_a;
+					end
+					4'd11: begin 
+						seg = `data_b;
+					end
+					4'd12: begin 
+						seg = `data_c;
+					end
+					4'd13: begin 
+						seg = `data_d;
+					end
+					4'd14: begin 
+						seg = `data_e;
+					end
+					4'd15: begin 
+						seg = `data_f;
+					end
+				endcase
+			end
+			else begin 
+				seg = `data_0;
+			end
+		end
+		if(k1_ten == 1'b0) begin 
+			if(shiwei == 4'b1111) begin 
+				shiwei = 0;
+			end else begin 
+				shiwei = shiwei + 1;
+			end
+		end
+		if(k2_ge == 1'b0) begin 
+			if(gewei == 4'b1111) begin 
+				gewei = 0;
+			end else begin 
+				gewei = gewei + 1;
+			end
+		end
+	end 
+	
+endmodule
